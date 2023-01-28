@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>TransLines</title>
+        <style type="text/css">
+            .dialog-para {
+                user-select: none;
+            }
+
+            .dialog-word {
+                margin: 0.2em;
+                display: inline-block;
+                user-select: none;
+            }
+
+            .dialog-word:hover {
+                background-color: aquamarine;
+            }
+
+            .selected {
+                background-color: cornflowerblue;
+            }
+
+            #selection_box {
+                position: absolute;
+                pointer-events: none;
+
+                z-index: 100;
+
+                background-color: rgba(100, 200, 255, 0.5);
+            }
+        </style>
+        <script type="text/javascript">
+            function getParagraphs(srcText) {
+                var srcParas = srcText.split('\n');
+                paras = [ ]
+
+                srcParas.forEach(para => {
+                    if (para.trim() == '') // Skip empty lines (paragraphs)
+                        return;
+
+                    paras.push(para);
+                });
+                return paras;
+            }
+
+            function includeRect(ax0, ax1, ay0, ay1, bx0, bx1, by0, by1) {
+                return ax0 <= bx0 && ax1 >= bx1 && ay0 <= by0 && ay1 >= by1;
+            }
+
+            // Languages list
+            languages = [
+                'zh_cn',
+                'en_us'
+            ];
+
+            // Controls on page
+            var selectionBox;
+            var debugInfo;
+
+            // Selection variables
+            var selecting = false;
+            var selStartX = 0;
+            var selStartY = 0;
+
+            async function loadSource(lang) {
+                const response = await fetch(`source-${lang}.txt`);
+                const srcText = await response.text();
+
+                return srcText;
+            }
+
+            async function loadSources() {
+                allParas = { }
+                paraCount = 0;
+                error = false;
+
+                for (const lang of languages) {
+                    var srcText = await loadSource(lang);
+
+                    allParas[lang] = getParagraphs(srcText);
+
+                    console.log(`Paragraph count for ${lang}: ${allParas[lang].length}`);
+
+                    if (paraCount === 0)
+                        paraCount = allParas[lang].length;
+                    else if (paraCount != allParas[lang].length) {
+                        console.log('Error: Paragraph count doesn\'t match!');
+                        error = true;
+                    }
+                }
+
+                return {
+                    hasError: error,
+                    paraCount: paraCount,
+                    allParas: allParas
+                };
+            }
+
+            function refreshTable(paraCount, allParas) {
+                var mainContainer = document.querySelector('#main_container');
+
+                for (var paraIdx = 0;paraIdx < paraCount;paraIdx++) {
+                    //console.log(`Generating paragraph #${paraIdx}`);
+                    var rowElem = document.createElement('tr');
+                    rowElem.classList.add('dialog-row');
+
+                    mainContainer.appendChild(rowElem);
+
+                    languages.forEach(lang => {
+                        var paraElem = document.createElement('td');
+                        paraElem.classList.add('dialog-para');
+
+                        rowElem.appendChild(paraElem);
+                        
+                        var para = allParas[lang][paraIdx];
+                        var words = para.split(' ');
+
+                        words.forEach(word => {
+                            if (word.trim() == '') // Skip empty words
+                                return;
+
+                            var wordElem = document.createElement('span');
+                            wordElem.innerHTML = word;
+                            wordElem.classList.add('dialog-word');
+
+                            paraElem.appendChild(wordElem);
+                        });
+                    });
+
+                };
+            }
+
+            function selectionStart(e) {
+                selecting = true;
+                selStartX = e.clientX;
+                selStartY = e.clientY;
+
+                selectionBox.style.left = `${selStartX}px`;
+                selectionBox.style.top = `${selStartY}px`;
+
+                selectionBox.style.width = '1px';
+                selectionBox.style.height = '1px';
+
+                selectionBox.style.visibility = 'visible';
+            }
+
+            function selectionResize(e) {
+                if (!selecting)
+                    return;
+
+                var x0 = Math.min(e.clientX, selStartX);
+                var x1 = Math.max(e.clientX, selStartX);
+                var y0 = Math.min(e.clientY, selStartY);
+                var y1 = Math.max(e.clientY, selStartY);
+
+                selectionBox.style.left = `${x0}px`;
+                selectionBox.style.top = `${y0}px`;
+
+                selectionBox.style.width = `${x1 - x0}px`;
+                selectionBox.style.height = `${y1 - y0}px`;
+                
+                debugInfo.innerHTML = `Selection: (${x0}, ${y0}, ${x1}, ${y1}) ${prev}`;
+
+                var prev = '';
+
+                document.querySelectorAll('.dialog-word').forEach(word => {
+                    var wordRect = word.getBoundingClientRect();
+
+                    if (includeRect(x0, x1, y0, y1, wordRect.left, wordRect.right, wordRect.top, wordRect.bottom))
+                    {
+                        prev += `${word.innerHTML} `;
+
+                        word.classList.add('selected');
+                        
+                    } else {
+                        word.classList.remove('selected');
+                    }
+
+                });
+
+                debugInfo.innerHTML = `Selection: (${x0}, ${y0}, ${x1}, ${y1})\n${prev}`;
+
+            }
+
+            function selectionEnd(e) {
+                selecting = false;
+
+                selectionBox.style.visibility = 'hidden';
+
+                debugInfo.innerHTML = 'Selection: &gt;_&lt;';
+            }
+
+            window.onload = function() {
+                // Hide selection box on start
+                selectionBox = document.querySelector('#selection_box');
+                selectionBox.style.visibility = 'hidden';
+
+                debugInfo = document.querySelector('#debug_info');
+                
+                // Load source texts async, then fill page content
+                loadSources().then(thing => {
+                    if (thing.hasError) {
+                        console.log('Data error, operation canceled');
+                        return;
+                    } else {
+                        refreshTable(thing.paraCount, thing.allParas);
+
+                        mainContainer = document.querySelector('#main_container');
+
+                        mainContainer.addEventListener('mousedown', selectionStart,  false);
+                        mainContainer.addEventListener('mousemove', selectionResize, false);
+                        mainContainer.addEventListener('mouseup',   selectionEnd,    false);
+                    }
+                });
+            }
+            
+        </script>
+    </head>
+    <body>
+        <table id='main_container' border="1">
+
+        </table>
+        <span id='selection_box'>
+        </span>
+        <p id='debug_info'>Selection: &gt;_&lt;</p>
+    </body>
+</html>

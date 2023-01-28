@@ -1,0 +1,8 @@
+Grass can spread to nearby dirt blocks, but not coarse dirt or rooted dirt. Grass spreading without player intervention depends heavily on the time of day.‌[Java Edition only] For a dirt block to accept grass from a nearby grass block, the following requirements must be met:
+
+    The dirt block receiving grass must be within a 3×5×3 range of the source grass block where the source block is in the center of the second topmost layer of that range.
+    The source grass block must have a light level of 9 or brighter directly above it.‌[Java Edition only]
+    The block directly above the dirt block must allow light to pass through it and hit the dirt block, even though the actual light level does not matter. That means blocks that partially let light through such as stairs and slabs must not have their light-blocking side(s)‌[Java Edition only] facing the dirt block.
+    The block directly above the dirt block must not be lava, water, or a waterlogged variant of a block.
+
+Though water and lava are both light-filtering blocks (meaning they decrease skylight by 1 level but do not affect block light), other light-filtering blocks such as ice and slime blocks do not block grass from spreading to the dirt block. Grass blocks can grow under all other transparent blocks like glass,‌[only] fences, or torches. Grass jumps directly from one block to a neighbor and is not affected by gaps or other blocks being "in the way." Grass blocks spread at random intervals and have an equal chance of spreading to any suitable dirt blocks that are in range. Because grass can spread as much as 3 levels downward, it tends to spread down slopes much faster than it spreads up them. 
