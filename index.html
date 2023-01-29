@@ -45,8 +45,10 @@
                 return paras;
             }
 
-            function includeRect(ax0, ax1, ay0, ay1, bx0, bx1, by0, by1) {
-                return ax0 <= bx0 && ax1 >= bx1 && ay0 <= by0 && ay1 >= by1;
+            function doOverlap(ax0, ax1, ay0, ay1, bx0, bx1, by0, by1) {
+                //return ax0 <= bx0 && ax1 >= bx1 && ay0 <= by0 && ay1 >= by1;
+
+                return !(ax0 > bx1 || ax1 < bx0 || ay0 > by1 || ay1 < by0);
             }
 
             // Languages list
@@ -60,6 +62,9 @@
             var debugInfo;
 
             // Selection variables
+            const sequential = false;
+            const COUNT_LIM = 999999;
+
             var selecting = false;
             var selStartX = 0;
             var selStartY = 0;
@@ -111,11 +116,15 @@
                     languages.forEach(lang => {
                         var paraElem = document.createElement('td');
                         paraElem.classList.add('dialog-para');
+                        paraElem.setAttribute('para-idx', paraIdx);
+                        paraElem.setAttribute('para-lang', lang);
 
                         rowElem.appendChild(paraElem);
                         
                         var para = allParas[lang][paraIdx];
                         var words = para.split(' ');
+
+                        var wordIdx = 0;
 
                         words.forEach(word => {
                             if (word.trim() == '') // Skip empty words
@@ -124,6 +133,9 @@
                             var wordElem = document.createElement('span');
                             wordElem.innerHTML = word;
                             wordElem.classList.add('dialog-word');
+                            wordElem.setAttribute('word-idx', wordIdx);
+
+                            wordIdx++;
 
                             paraElem.appendChild(wordElem);
                         });
@@ -160,27 +172,107 @@
 
                 selectionBox.style.width = `${x1 - x0}px`;
                 selectionBox.style.height = `${y1 - y0}px`;
-                
-                debugInfo.innerHTML = `Selection: (${x0}, ${y0}, ${x1}, ${y1}) ${prev}`;
 
                 var prev = '';
+
+                var paraIdxStart = COUNT_LIM, paraIdxEnd = -1;
+                var selectedParaElems = [ ];
+                var selectedLangs = [ ];
 
                 document.querySelectorAll('.dialog-word').forEach(word => {
                     var wordRect = word.getBoundingClientRect();
 
-                    if (includeRect(x0, x1, y0, y1, wordRect.left, wordRect.right, wordRect.top, wordRect.bottom))
-                    {
-                        prev += `${word.innerHTML} `;
+                    word.classList.remove('selected');
 
-                        word.classList.add('selected');
+                    if (doOverlap(x0, x1, y0, y1,
+                            wordRect.left, wordRect.right, wordRect.top, wordRect.bottom))
+                    {
+                        if (!selectedParaElems.includes(word.parentElement)) {
+                            var wordPara = word.parentElement;
+                            var wordParaIdx = wordPara.getAttribute('para-idx');
+
+                            paraIdxStart = Math.min(paraIdxStart, wordParaIdx);
+                            paraIdxEnd   = Math.max(paraIdxEnd, wordParaIdx);
+
+                            if (!selectedLangs.includes(wordPara.getAttribute('para-lang')))
+                                selectedLangs.push(wordPara.getAttribute('para-lang'));
+                            
+                            selectedParaElems.push(wordPara);
+                        }
                         
-                    } else {
-                        word.classList.remove('selected');
                     }
 
                 });
 
-                debugInfo.innerHTML = `Selection: (${x0}, ${y0}, ${x1}, ${y1})\n${prev}`;
+                selectedParaElems.forEach(para => {
+                    paraIdx = para.getAttribute('para-idx');
+
+                    if (sequential) // Perform sequential selection
+                    {
+                        if (paraIdx > paraIdxStart && paraIdx < paraIdxEnd) { // Selected all words in this paragraph
+                            para.querySelectorAll('.dialog-word').forEach(word => {
+                                word.classList.add('selected');
+
+                                prev += `${word.innerHTML} `;
+                            });
+                        } else { // Select only a part of the words in this paragraph
+                            var wordIdxStart = COUNT_LIM, wordIdxEnd = -1;
+
+                            var isFirstPara = paraIdx == paraIdxStart;
+                            var isLastPara = paraIdx == paraIdxEnd;
+
+                            para.querySelectorAll('.dialog-word').forEach(word => {
+                                var wordIdx = word.getAttribute('word-idx');
+                                var wordRect = word.getBoundingClientRect();
+
+                                if (doOverlap(x0, x1, y0, y1,
+                                        wordRect.left, wordRect.right, wordRect.top, wordRect.bottom))
+                                {
+                                    wordPara = word.parentElement.getAttribute('para-idx');
+
+                                    if (isFirstPara) // First word of selection in this paragraph (first para in selection)
+                                        wordIdxStart = Math.min(wordIdxStart, wordIdx);
+                                        
+                                    if (isLastPara) // Last word of selection in this paragraph (last para in selection)
+                                        wordIdxEnd = Math.max(wordIdxEnd, wordIdx);
+                                    
+                                }
+
+                            });
+                            
+                            para.querySelectorAll('.dialog-word').forEach(word => {
+                                var wordIdx = word.getAttribute('word-idx');
+
+                                if (isFirstPara && wordIdx < wordIdxStart)
+                                    return;
+                                
+                                if (isLastPara && wordIdx > wordIdxEnd)
+                                    return;
+
+                                word.classList.add('selected');
+
+                                prev += `${word.innerHTML} `;
+                            });
+
+                        }
+                    } else { // Perform box selection
+                        para.querySelectorAll('.dialog-word').forEach(word => {
+                            var wordRect = word.getBoundingClientRect();
+                            
+                            if (doOverlap(x0, x1, y0, y1,
+                                    wordRect.left, wordRect.right, wordRect.top, wordRect.bottom))
+                            {
+                                word.classList.add('selected');
+
+                                prev += `${word.innerHTML} `;
+                            }
+                            
+                        });
+                    }
+
+                });
+
+                debugInfo.innerHTML = `Selection: (${x0}, ${y0}, ${x1}, ${y1}) [${paraIdxStart}, ${paraIdxEnd}] ${prev}`;
 
             }
 
@@ -188,8 +280,6 @@
                 selecting = false;
 
                 selectionBox.style.visibility = 'hidden';
-
-                debugInfo.innerHTML = 'Selection: &gt;_&lt;';
             }
 
             window.onload = function() {
