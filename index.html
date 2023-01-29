@@ -60,11 +60,11 @@
             // Controls on page
             var selectionBox;
             var debugInfo;
-
+            var sequentialCheckbox;
+            
+            const COUNT_LIMIT = 999999;
+            
             // Selection variables
-            const sequential = false;
-            const COUNT_LIM = 999999;
-
             var selecting = false;
             var selStartX = 0;
             var selStartY = 0;
@@ -175,7 +175,7 @@
 
                 var prev = '';
 
-                var paraIdxStart = COUNT_LIM, paraIdxEnd = -1;
+                var paraIdxStart = COUNT_LIMIT, paraIdxEnd = -1;
                 var selectedParaElems = [ ];
                 var selectedLangs = [ ];
 
@@ -204,6 +204,8 @@
 
                 });
 
+                const sequential = sequentialCheckbox.checked;
+
                 selectedParaElems.forEach(para => {
                     paraIdx = para.getAttribute('para-idx');
 
@@ -216,7 +218,7 @@
                                 prev += `${word.innerHTML} `;
                             });
                         } else { // Select only a part of the words in this paragraph
-                            var wordIdxStart = COUNT_LIM, wordIdxEnd = -1;
+                            var wordIdxStart = COUNT_LIMIT, wordIdxEnd = -1;
 
                             var isFirstPara = paraIdx == paraIdxStart;
                             var isLastPara = paraIdx == paraIdxEnd;
@@ -288,6 +290,8 @@
                 selectionBox.style.visibility = 'hidden';
 
                 debugInfo = document.querySelector('#debug_info');
+
+                sequentialCheckbox = document.querySelector('#sequential_checkbox');
                 
                 // Load source texts async, then fill page content
                 loadSources().then(thing => {
@@ -312,6 +316,10 @@
         <table id='main_container' border="1">
 
         </table>
+        <div>
+            <input type="checkbox" id="sequential_checkbox" name="test" checked>
+            <label for="sequential_checkbox">Sequential selection</label>
+        </div>
         <span id='selection_box'>
         </span>
         <p id='debug_info'>Selection: &gt;_&lt;</p>
